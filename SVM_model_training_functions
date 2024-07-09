@@ -1,3 +1,19 @@
+#General comments
+#code stored in functions format so that it can be simply imported from the directory, rather than requiring the entire code
+
+'''
+sample_data is the variable that holds the Excel file.
+sample_proc is what is obtained post-sorting and preprocessing
+X_sample_proc/Y_sample_proc are the features and labels of the sample (analogous with X_data_proc/Y_dataproc)
+PCA done outside function (can be incorporated into function as well)
+
+'functions' returns Y_data_proc (the labels for the training dataset), X_data_proc (the features on which the data is trained)
+model_path (the path for the model), and scaler (the scaler used for data feature scaling).
+
+NOTE: X_data_proc (stored in dataX) is used for proper PCA fitting, and scaler (stored in feature_scaler) is used for proper feature scaling
+
+'''
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
