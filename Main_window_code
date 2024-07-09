@@ -1,0 +1,28 @@
+#read sampe dataset for testing
+sample_data = pd.read_excel(r"/content/drive/MyDrive/PS1/Dataset_HARD.xlsx")
+
+#Sample sorting and preprocessing
+sample_list = sample_data.values.tolist()
+sample_finallist = data_sorting(sample_list)
+sample_proc = preprocessing(sample_finallist)
+
+#defining X and Y for sample dataset
+X_sample_proc = np.array([entry[1] for entry in sample_proc])
+Y_sample_proc = np.array([entry[0] for entry in sample_proc])
+
+#Dimensionality reduction using PCA for sample dataset
+pca = PCA(n_components=20)
+pca.fit(dataX) #dataX is X_data_proc used to train dataset
+X_sample_pca = pca.transform(X_sample_proc)
+
+#Sample feature scaling
+X_sample_pca = feature_scaler.transform(X_sample_pca) #feature_scaler is the same scaler used for training dataset
+
+#Loading model and sample prediction
+model = joblib.load(model_path)
+sample_pred = model_prediction(model, X_sample_pca)
+
+#plotting ROC and confusion matrix
+plotting(model, X_sample_pca, dataY, Y_sample_proc, sample_pred)
+
+#dataY is same as Y_data_proc (the labels of the training dataset)
