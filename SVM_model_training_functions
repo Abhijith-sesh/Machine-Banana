@@ -1,0 +1,180 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.signal import savgol_filter, detrend
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
+from sklearn.decomposition import PCA
+import joblib
+from sklearn.preprocessing import label_binarize
+from itertools import cycle
+
+def data_sorting(data):
+    #defining placeholder lists
+    LDPEdata=[]
+    PPdata=[]
+    PETdata=[]
+    Non_plasticsdata=[]
+    MLPdata=[]
+    finallist=[]
+
+    #sorting data
+    for i in range(len(data)):
+        if(data[i][0]=="LDPE"):
+            LDPEdata.append(data[i])
+        if(data[i][0]=="PP"):
+            PPdata.append(data[i])
+        if(data[i][0]=="PET"):
+            PETdata.append(data[i])
+        if(data[i][0]=="Non-plastics"):
+            Non_plasticsdata.append(data[i])
+        if(data[i][0]=="MLP"):
+            MLPdata.append(data[i])
+
+    #appending lists to collated finallist
+    finallist.extend(PPdata)
+    finallist.extend(PETdata)
+    finallist.extend(Non_plasticsdata)
+    finallist.extend(MLPdata)
+    finallist.extend(LDPEdata)
+
+    return finallist
+
+
+def preprocessing(data):
+    # Smoothing parameters
+    window_length = 3 # n = 3
+    polyorder = 2 # p = 2
+
+    # Baseline correction by computing the second derivative
+    matrixfinallist = []
+
+    for i in range(len(data)):
+        label = data[i][0]
+        values = np.array(data[i][1::], dtype=float)
+
+        # Detrend the data
+        detrended_data = detrend(values, type="constant")
+
+        # Smoothing and baseline correction using Savitzky-Golay filter
+        smoothed_values = savgol_filter(detrended_data, window_length, polyorder, deriv=0, delta=1) # Smoothing
+        baseline_corrected_values = savgol_filter(smoothed_values, window_length, polyorder, deriv=2, delta=1) # Second derivative for baseline correction
+
+        # Store the results
+        matrixfinallist.append([label, baseline_corrected_values])
+
+    return matrixfinallist
+
+
+def model_training(X, Y):
+    # Split the dataset into training and testing sets
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+
+    # Feature scaling
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
+    # Train an SVM model
+    svm_model = SVC(kernel='linear', probability=True, random_state=42)
+    svm_model.fit(X_train, Y_train)
+
+    return svm_model, scaler, X_test, Y_test
+
+
+def model_prediction(model, X_inp):
+    # Make predictions on the test set
+    Y_pred = model.predict(X_inp)
+    return Y_pred
+
+
+def model_save(model):
+    # Save the model
+    filepath = "/content/drive/MyDrive/PS1/svm_model_trial.pkl"
+    joblib.dump(model, filepath)
+    return filepath
+
+
+def load_model(model_path):
+    # Load the saved model
+    model = joblib.load(model_path)
+    return model
+
+
+def plotting(model, X_test, y, y_test, y_pred):
+  # Evaluate the model
+  print(confusion_matrix(y_test, y_pred))
+  print(classification_report(y_test, y_pred))
+
+  # Plotting confusion matrix for all classes
+  cm = confusion_matrix(y_test, y_pred)
+  plt.figure(figsize=(8, 8))
+  plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+  plt.title('Confusion Matrix for All Classes')
+  plt.colorbar()
+  tick_marks = np.arange(len(np.unique(y)))
+  plt.xticks(tick_marks, np.unique(y), rotation=45)
+  plt.yticks(tick_marks, np.unique(y))
+  plt.tight_layout()
+  plt.ylabel('True label')
+  plt.xlabel('Predicted label')
+  plt.show()
+
+  # Plot ROC curves for all classes
+  y_test_binarized = label_binarize(y_test, classes=np.unique(y))
+  n_classes = y_test_binarized.shape[1]
+
+  y_score = model.predict_proba(X_test)
+
+  # Compute ROC curve and ROC area for each class
+  fpr = dict()
+  tpr = dict()
+  roc_auc = dict()
+  for i in range(n_classes):
+    fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_score[:, i])
+    roc_auc[i] = auc(fpr[i], tpr[i])
+
+  # Compute micro-average ROC curve and ROC area
+  fpr["micro"], tpr["micro"], _ = roc_curve(y_test_binarized.ravel(), y_score.ravel())
+  roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+  # Plot ROC curves
+  plt.figure()
+  colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'red', 'green'])
+  for i, color in zip(range(n_classes), colors):
+    plt.plot(fpr[i], tpr[i], color=color, lw=2, label=f'ROC curve of class {i} (area = {roc_auc[i]:.2f})')
+
+  plt.plot([0, 1], [0, 1], 'k--', lw=2)
+  plt.xlim([0.0, 1.0])
+  plt.ylim([0.0, 1.05])
+  plt.xlabel('False Positive Rate')
+  plt.ylabel('True Positive Rate')
+  plt.title('Receiver Operating Characteristic (ROC) Curve for All Classes')
+  plt.legend(loc="lower right")
+  plt.show()
+
+
+def functions(data):
+    #call this function to train model on required dataset, and to ge model filepath (model_path)
+    list_data = data.values.tolist()
+
+    #sorting data into list
+    data_finallist = data_sorting(list_data)
+    data_proc = preprocessing(data_finallist)
+
+    #defining X and Y for training model
+    X_data_proc = np.array([entry[1] for entry in data_proc])
+    Y_data_proc = np.array([entry[0] for entry in data_proc])
+
+    #Dimensionality reduction using PCA
+    pca = PCA(n_components=20)
+    pca.fit(X_data_proc)
+    X_pca = pca.transform(X_data_proc)
+
+    #Splitting dataset into training and testing data
+    model, scaler, X_test, Y_test = model_training(X_pca, Y_data_proc)
+    model_path = model_save(model)
+
+    return Y_data_proc, X_data_proc, model_path, scaler
